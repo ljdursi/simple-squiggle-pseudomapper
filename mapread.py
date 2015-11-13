@@ -83,62 +83,34 @@ def main():
         # For each set of mappings for the current read, calculate the
         # weighted scores for starting in each bin on the reference
         best = []
-        templ_bins = [start_bin_weights(template, binsize) for template in maps_templ]
-        compl_bins = [start_bin_weights(complement, binsize) for complement in maps_compl]
+        templ_bins = [start_bin_scores(template, binsize) for template in maps_templ]
+        compl_bins = [start_bin_scores(complement, binsize) for complement in maps_compl]
 
         # Find the combination of template+complement models which
         # produce the highest-scoring localizations
         nbest = 10
         for i, template in enumerate(templ_bins):
             for j, complement in enumerate(compl_bins):
-                votes = template+complement
+                scores = template+complement
 
                 # overlapping bins
-                votes = votes[:-1] + votes[1:]
+                scores = scores[:-1] + scores[1:]
 
                 # "best" here is zscore: number of std deviations above mean
-                zscore = (votes - numpy.mean(votes))/numpy.std(votes)
+                zscore = (scores - numpy.mean(scores))/numpy.std(scores)
                 localbest = zscore.argsort()[-nbest:][::-1]
 
                 best = best + [(zscore[idx], idx, (bin_edges[idx], bin_edges[idx+2]),
-                                i, j, votes) for idx in localbest]
+                                i, j, scores) for idx in localbest]
 
         best.sort()
         best = best[-nbest:][::-1]
         print("Best locations: ", [(b[0], b[2], b[3], b[4]) for b in best])
 
-        local_rescaling = False
-        if local_rescaling:
-            # now do a local rescaling and re-score
-            newbest = []
-            for _, idx, map_range, i, j, _ in best:
-
-                read_dmers = templ_idxs[i].events_to_dmer_array(reads_templ[i], each_dmer=True)
-                maps_templ_new, _ = maps_templ[i].local_rescale(read_dmers, map_range)
-                votes = start_bin_weights(maps_templ_new, binsize)
-
-                maps_compl_new = None
-                if maps_compl[j] is not None:
-                    read_dmers = compl_idxs[j].events_to_dmer_array(reads_compl[j], each_dmer=True)
-                    maps_compl_new, _ = maps_compl[j].local_rescale(read_dmers, map_range)
-                    votes = votes + start_bin_weights(maps_compl_new, binsize)
-
-                votes = votes[:-1] + votes[1:]
-                zscore = (votes - numpy.mean(votes))/numpy.std(votes)
-                newbest = newbest + [(zscore[idx], idx, map_range, i, j,
-                                      maps_templ_new, maps_compl_new, votes)]
-
-            newbest.sort()
-            newbest = newbest[::-1]
-            print("Best locations after rescaling: ", [tuple(x[0:4]) for x in newbest])
-
-            zscore, bestidx, map_range, idx_templ, idx_compl, mappings_templ, mappings_compl, votes = newbest[0]
-            del newbest
-        else:
-            zscore, bestidx, map_range, idx_templ, idx_compl, votes = best[0]
-            mappings_templ = maps_templ[idx_templ]
-            print(idx_compl)
-            mappings_compl = maps_compl[idx_compl] if args.usecomplement else None
+        zscore, bestidx, map_range, idx_templ, idx_compl, scores = best[0]
+        mappings_templ = maps_templ[idx_templ]
+        print(idx_compl)
+        mappings_compl = maps_compl[idx_compl] if args.usecomplement else None
 
         allmappings = mappings_templ
         if mappings_compl is not None:
@@ -159,13 +131,13 @@ def main():
 
         print("%s %s Best location in bin %d,%d zscore = %f,%f" %
               (os.path.splitext(infile)[0], strand, bin_edges[bestidx],
-               bin_edges[bestidx+2], zscore, votes[bestidx]))
+               bin_edges[bestidx+2], zscore, scores[bestidx]))
 
         if not args.plot == "stats-only":
             matplotlib.pylab.subplot(grid[1])
             matplotlib.pylab.title("Starting position distribution")
-            matplotlib.pylab.plot(bin_edges[bestidx], votes[bestidx], 'ro')
-            matplotlib.pylab.plot(bin_edges[1:-1], votes, '.')
+            matplotlib.pylab.plot(bin_edges[bestidx], scores[bestidx], 'ro')
+            matplotlib.pylab.plot(bin_edges[1:-1], scores, '.')
             matplotlib.pylab.xlim([-reflen, reflen])
 
         if args.plot == "save":
@@ -206,9 +178,9 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest, complement=False):
     return scaledreads, mappings, readlen
 
 
-def start_bin_weights(mappings, binsize, map_range=None, return_bins=False):
+def start_bin_scores(mappings, binsize, map_range=None, return_bins=False):
     """
-    Returns a bin of weights representing a liklihood of the read beginning
+    Returns a bin of scores representing a liklihood of the read beginning
     within that bin of reference positions.
     """
     if mappings is None:
@@ -222,17 +194,17 @@ def start_bin_weights(mappings, binsize, map_range=None, return_bins=False):
     rangemax = map_range[1]
 
     # for this very simple model, each mapping contributes 1/dist^2
-    # worth of weight to the bin
-    votecontributions = 1./(mappings.dists*mappings.dists+.1)
+    # worth of scores to the bin
+    contributions = 1./(mappings.dists*mappings.dists+.1)
     starts = mappings.starts
 
-    votebins = numpy.arange(rangemin, rangemax+binsize-1, binsize)
-    votes, _ = numpy.histogram(starts, bins=votebins, weights=votecontributions)
+    scorebins = numpy.arange(rangemin, rangemax+binsize-1, binsize)
+    scores, _ = numpy.histogram(starts, bins=scorebins, weights=contributions)
 
     if return_bins:
-        return votes, votebins
+        return scores, scorebins
     else:
-        return votes
+        return scores
 
 
 if __name__ == "__main__":
