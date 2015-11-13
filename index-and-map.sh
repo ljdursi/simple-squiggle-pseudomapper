@@ -31,6 +31,8 @@ function mapreads {
         if [ ! -z "$4" ]
         then
             complementoption="--complementindex"
+        else
+            complementoption=""
         fi
         if [ ! -z "$5" ]
         then
