@@ -123,6 +123,11 @@ class SpatialIndex(object):
         self.__starts = None
 
     def set_locs_and_starts(self, locations, starts):
+        """
+        Sets the matching locations of each individual kmer and where
+        each unique kmer position starts in that list; do it in a method
+        here so it is set in the superclass
+        """
         self.__locations = locations
         self.__starts = starts
 
@@ -139,14 +144,14 @@ class SpatialIndex(object):
         """
         if not isinstance(model, poremodel.PoreModel):
             raise ValueError("KDTreeIndex.__init__(): second argument must be a pore model")
-        """
-        First, the sequence (and its reverse complement) is turned into:
-            - an array of integers representing dmers in the sequence (eg, AAAAAAAA = 0)
-            - the list of genomic locations corresponding to each
-               ( which is just 1,2,3...N,-1,-2,-3...-N
-              with negative values corresponding to locations on the complement
-              strand
-        """
+
+        # First, the sequence (and its reverse complement) is turned into:
+        #    - an array of integers representing dmers in the sequence (eg, AAAAAAAA = 0)
+        #    - the list of genomic locations corresponding to each
+        #       ( which is just 1,2,3...N,-1,-2,-3...-N
+        #      with negative values corresponding to locations on the complement
+        #      strand
+
         # convert to events (which represent kmers)
         with Timer("Generating events", verbose) as timer:
             complement = ""
@@ -188,13 +193,13 @@ class SpatialIndex(object):
             starts = numpy.concatenate((numpy.array([0]), starts))
             if verbose:
                 print("total entries = "+str(len(kmers)))
-            
+
         # extract the dmer level means and std deviations corresponding to each dmer
         with Timer("Extracting Kmers", verbose) as timer:
             data = numpy.zeros((len(kmers), dimension), dtype=numpy.float32)
             sdata = numpy.zeros((len(kmers), dimension), dtype=numpy.float32)
 
-            for i, kmer in enumerate(kmers):
+            for i in range(len(kmers)):
                 loc = locs[starts[i]]
                 if loc < 0:
                     idx = -(loc+1)
@@ -267,7 +272,8 @@ class SpatialIndex(object):
         """
         return self.__model.scale_events(events, sds)
 
-    def lookup(self, readEventKmer, maxdist=4.25, closest=False):
+    def lookup(self, read_dmers, maxdist=4.25, closest=False):
+        """ Lookup function """
         pass
 
     @property
@@ -292,8 +298,8 @@ class Mappings(object):
 
     The class defines several operations on these mappings.
     """
-    def __init__(self, readlocs, idxlocs, dists, nearestdmers, referenceLen, 
-                 readlen, complementStrand=False):
+    def __init__(self, readlocs, idxlocs, dists, nearestdmers, referenceLen,
+                 readlen, complement=False):
         """
         Initializes a mapping.
         Inputs:
@@ -306,23 +312,26 @@ class Mappings(object):
         assert len(readlocs) == len(idxlocs)
         assert len(idxlocs) == len(dists)
         assert nearestdmers.shape[0] == len(dists)
-        self.readLocs = readlocs
-        self.idxLocs = idxlocs
+        self.read_locs = readlocs
+        self.idx_locs = idxlocs
         self.dists = dists
-        self.nearestDmers = nearestdmers
+        self.nearest_dmers = nearestdmers
         self.reflen = referenceLen
         self.readlen = readlen
-        self.complementStrand = complementStrand
+        self.complement = complement
 
     def __str__(self):
         """
         Readable output summary of a mapping
         """
-        output = "Mappings: ReferenceLength = %d, complementStrand = %d, readlength = %d\n" % (self.reflen, self.readlen, self.complementStrand)
-        output += "        : nmatches = %d\n" % (len(self.readLocs))
-        for r, i, d, n in zip(self.readLocs[:5], self.idxLocs[:5], self.dists[:5], self.nearestDmers[:5, :]):
-            output += " %d: %d (%5.3f) " % (r, i, d) + numpy.array_str(n, precision=2, suppress_small=True) + "\n"
-        if len(self.readLocs) > 5:
+        output = "Mappings: ReferenceLength = %d, complement = %d, readlength = %d\n" \
+                % (self.reflen, self.readlen, self.complement)
+        output += "        : nmatches = %d\n" % (len(self.read_locs))
+        for read, idx, dist, nearest in zip(self.read_locs[:5], self.idx_locs[:5],
+                                            self.dists[:5], self.nearest_dmers[:5, :]):
+            output += " %d: %d (%5.3f) " % (read, idx, dist) + \
+                      numpy.array_str(nearest, precision=2, suppress_small=True) + "\n"
+        if len(self.read_locs) > 5:
             output += " ...\n"
         return output
 
@@ -330,9 +339,9 @@ class Mappings(object):
         """
         Sets the complement strand flag of the mapping
         """
-        self.complementStrand = complement
+        self.complement = complement
 
-    def complementToTemplateCoords(self, complement_coords):
+    def coords_compl_to_templ(self, complement_coords):
         """
         Converts a set of complement strand coordinates to corresponding
         template strand coordinates, given the mapping reference length
@@ -349,10 +358,10 @@ class Mappings(object):
         Returns the array of implied starting positions of the read, given the
         list of read-to-reference mappings
         """
-        startlocs = numpy.sign(self.idxLocs)*\
-                     numpy.mod(numpy.abs(self.idxLocs)-self.readLocs+self.reflen, self.reflen)
-        if self.complementStrand:
-            startlocs = self.complementToTemplateCoords(startlocs)
+        startlocs = numpy.sign(self.idx_locs)*\
+                     numpy.mod(numpy.abs(self.idx_locs)-self.read_locs+self.reflen, self.reflen)
+        if self.complement:
+            startlocs = self.coords_compl_to_templ(startlocs)
         return startlocs
 
     def append(self, other):
@@ -362,20 +371,22 @@ class Mappings(object):
         If the two are of the same strand, this is a simple concatenation;
         if not, must convert to the template coordinates and append
         """
-        if self.complementStrand == other.complementStrand:
-            return Mappings(numpy.concatenate((self.readLocs, other.readLocs)),
-                            numpy.concatenate((self.idxLocs, other.idxLocs)),
+        if self.complement == other.complement:
+            return Mappings(numpy.concatenate((self.read_locs, other.read_locs)),
+                            numpy.concatenate((self.idx_locs, other.idx_locs)),
                             numpy.concatenate((self.dists, other.dists)),
-                            numpy.concatenate((self.nearestDmers, other.nearestDmers)),
+                            numpy.concatenate((self.nearest_dmers, other.nearest_dmers)),
                             self.reflen,
                             self.readlen+other.readlen,
-                            self.complementStrand)
+                            self.complement)
         else:
-            template, complement = (self, other) if self.complementStrand else (other, self)
-            return Mappings(numpy.concatenate((template.readLocs, template.readlen-complement.readLocs)),
-                            numpy.concatenate((template.idxLocs, complement.complementToTemplateCoords(complement.idxLocs))),
+            template, complement = (self, other) if self.complement else (other, self)
+            return Mappings(numpy.concatenate((template.read_locs,
+                                               template.readlen-complement.read_locs)),
+                            numpy.concatenate((template.idx_locs,
+                                               complement.coords_compl_to_templ(complement.idx_locs))),
                             numpy.concatenate((template.dists, complement.dists)),
-                            numpy.concatenate((template.nearestDmers, complement.nearestDmers)),
+                            numpy.concatenate((template.nearest_dmers, complement.nearest_dmers)),
                             template.reflen,
                             template.readlen,
                             False)
@@ -395,18 +406,18 @@ class Mappings(object):
         starts = self.starts
         valid = numpy.where((starts >= map_range[0]) & (starts <= map_range[1]))[0]
 
-        read_events = read_dmers[self.readLocs[valid], :].reshape(read_dmers[self.readLocs[valid], :].size)
-        idx_events = self.nearestDmers[valid, :].reshape(self.nearestDmers[valid, :].size)
+        read_events = read_dmers[self.read_locs[valid], :].reshape(read_dmers[self.read_locs[valid], :].size)
+        idx_events = self.nearest_dmers[valid, :].reshape(self.nearest_dmers[valid, :].size)
 
         if valid.size == 0:
             return self, (1, 0)
         fit = numpy.polyfit(read_events, idx_events, 1)
         new_dmers = fit[0]*read_dmers + fit[1]
-        dists = numpy.sqrt(numpy.sum((new_dmers[self.readLocs, :] - self.nearestDmers)*\
-                                     (new_dmers[self.readLocs, :] - self.nearestDmers), axis=1))
+        dists = numpy.sqrt(numpy.sum((new_dmers[self.read_locs, :] - self.nearest_dmers)*\
+                                     (new_dmers[self.read_locs, :] - self.nearest_dmers), axis=1))
 
-        return Mappings(self.readLocs, self.idxLocs, dists, self.nearestDmers,
-                        reflen, self.readlen, self.complementStrand), fit
+        return Mappings(self.read_locs, self.idx_locs, dists, self.nearest_dmers,
+                        reflen, self.readlen, self.complement), fit
 
 
 class KDTreeIndex(SpatialIndex):
@@ -415,10 +426,13 @@ class KDTreeIndex(SpatialIndex):
     uses cKDTree in scipy.spatial, with very small modifications
     also works with sklearn.neighbours kdtree
     """
-    def __init__(self, sequence, name, model, dimension, include_complement=True, maxentries=10, verbose=False):
+    def __init__(self, sequence, name, model, dimension, include_complement=True,
+                 maxentries=10, verbose=False):
         super(KDTreeIndex, self).__init__(sequence, name, model, dimension, maxentries)
 
-        events, sds, locations, starts = self.kmers_from_sequence(sequence, model, dimension, include_complement, maxentries, verbose)
+        events, _, locations, starts = self.kmers_from_sequence(sequence, model,
+                                                                dimension, include_complement,
+                                                                maxentries, verbose)
         self.set_locs_and_starts(locations, starts)
 
         if verbose:
@@ -442,7 +456,7 @@ class KDTreeIndex(SpatialIndex):
         """Scale input (read) events to model"""
         return super(KDTreeIndex, self).scale_events(events, sds)
 
-    def lookup(self, readEventKmers, maxdist=4.25, closest=False):
+    def lookup(self, read_dmers, maxdist=4.25, closest=False):
         """
         For a given set of read events, return a list of mappings
         between the read events and the indexed reference.
@@ -454,35 +468,43 @@ class KDTreeIndex(SpatialIndex):
                 only return mappings to closest dmer.  If False,
                 return mappings to all dmers within maxdist
         """
-        Match = collections.namedtuple("Match", ["dist", "idxLocs", "nearestDmer", "readLoc"])
+        Match = collections.namedtuple("Match", ["dist", "idx_locs", "nearestDmer", "readLoc"])
 
-        if readEventKmers.ndim == 1:
-            readEventKmers = [readEventKmers]
+        if read_dmers.ndim == 1:
+            read_dmers = [read_dmers]
 
-        def dist(readPosn, idx):
-            p = readEventKmers[readPosn, :]
+        def dist(read_posn, idx):
+            """Distance between read_dmer at position read_pos and dmer index idx"""
+            p = read_dmers[read_posn, :]
             q = self.__kdtree.data[idx, :]
             return numpy.sqrt(numpy.max((p-q)*(p-q)))
 
         if closest:
-            dists, idxs = self.__kdtree.query(readEventKmers)
+            dists, idxs = self.__kdtree.query(read_dmers)
             nearests = self.__kdtree.data[idxs, :]
             matches = [self.index_to_genomic_locations(idx) for idx in idxs]
-            results = [Match(*result) for result in zip(dists, matches, nearests, range(len(dists)))]
+            results = [Match(*result) for result in zip(dists, matches,
+                                                        nearests, range(len(dists)))]
         else:
-            idxs = self.__kdtree.query_ball_point(readEventKmers, maxdist)
+            idxs = self.__kdtree.query_ball_point(read_dmers, maxdist)
             #below is the corresponding line for sklearn.neighbours.KDTree
-            #idxs = self.__kdtree.query_radius(readEventKmers, maxdist)
-            results = [Match(dist(posn, pidx), self.index_to_genomic_locations(pidx), self.__kdtree.data[pidx, :], posn)
+            #idxs = self.__kdtree.query_radius(read_dmers, maxdist)
+            results = [Match(dist(posn, pidx), self.index_to_genomic_locations(pidx),
+                             self.__kdtree.data[pidx, :], posn)
                        for posn, pidxs in enumerate(idxs)
                        for pidx in pidxs]
 
-        dists = numpy.array([match.dist for match in results for idx in match.idxLocs], dtype=numpy.float32)
-        readLocs = numpy.array([match.readLoc for match in results for idx in match.idxLocs], dtype=numpy.int)
-        idxLocs = numpy.array([idx for match in results for idx in match.idxLocs], dtype=numpy.int)
-        nearests = numpy.array([match.nearestDmer for match in results for idx in match.idxLocs], dtype=numpy.float32)
+        dists = numpy.array([match.dist for match in results for idx in match.idx_locs],
+                            dtype=numpy.float32)
+        read_locs = numpy.array([match.readLoc for match in results for idx in match.idx_locs],
+                                dtype=numpy.int)
+        idx_locs = numpy.array([idx for match in results for idx in match.idx_locs],
+                               dtype=numpy.int)
+        nearests = numpy.array([match.nearestDmer for match in results for idx in match.idx_locs],
+                               dtype=numpy.float32)
 
-        return Mappings(readLocs, idxLocs, dists, nearests, referenceLen=self.reference_length, readlen=len(readEventKmers))
+        return Mappings(read_locs, idx_locs, dists, nearests,
+                        referenceLen=self.reference_length, readlen=len(read_dmers))
 
     def __getstate__(self):
         """

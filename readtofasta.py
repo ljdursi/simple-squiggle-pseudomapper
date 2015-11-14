@@ -37,7 +37,7 @@ def readfasta(filename, calls="2D"):
     return label, seq
 
 def build_filelist(filenames):
-    """ If given a directory, descend into directory and generate 
+    """ If given a directory, descend into directory and generate
         list of files (but do not descend into subdirectories)."""
     file_list = []
     for filename in filenames:

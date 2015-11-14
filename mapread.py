@@ -123,7 +123,7 @@ def main():
             matplotlib.rcParams['font.size'] = 8
             grid = matplotlib.gridspec.GridSpec(2, 1)
             matplotlib.pylab.subplot(grid[0])
-            matplotlib.pylab.hist2d(allmappings.idxLocs, allmappings.readLocs,
+            matplotlib.pylab.hist2d(allmappings.idx_locs, allmappings.read_locs,
                                     weights=1./(allmappings.dists*allmappings.dists+0.1),
                                     bins=[readlen/10, 2*reflen//binsize],
                                     cmap=matplotlib.pylab.get_cmap('Blues'))
