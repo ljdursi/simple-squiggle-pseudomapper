@@ -143,14 +143,14 @@ class SpatialIndex(object):
               sequence corresponds to locations [starts[i],starts[i+1])
         """
         if not isinstance(model, poremodel.PoreModel):
-            raise ValueError("KDTreeIndex.__init__(): second argument must be a pore model")
+            raise ValueError("KDTreeIndex.__init__(): must provide pore model")
 
         # First, the sequence (and its reverse complement) is turned into:
-        #    - an array of integers representing dmers in the sequence (eg, AAAAAAAA = 0)
-        #    - the list of genomic locations corresponding to each
-        #       ( which is just 1,2,3...N,-1,-2,-3...-N
-        #      with negative values corresponding to locations on the complement
-        #      strand
+        #  - an array of integers representing dmers in sequence (eg, AA..A = 0)
+        #  - the list of genomic locations corresponding to each
+        #     ( which is just 1,2,3...N,-1,-2,-3...-N )
+        #    with negative values corresponding to locations on the complement
+        #    strand
 
         # convert to events (which represent kmers)
         with Timer("Generating events", verbose) as timer:
@@ -162,7 +162,8 @@ class SpatialIndex(object):
             compevents, compsds = model.sequence_to_events(complement)
 
             allkmers = numpy.zeros(len(refevents)-dimension+1+
-                                   len(compevents)-dimension+1, dtype=numpy.int64)
+                                   len(compevents)-dimension+1,
+                                   dtype=numpy.int64)
 
         # convert k+d-1-mers into integers
         with Timer("Converting to integer representations", verbose) as timer:
@@ -263,7 +264,8 @@ class SpatialIndex(object):
         else:
             step = 1
 
-        kmers = numpy.array([events[i:i+dim] for i in range(0, len(events)-dim+1, step)])
+        kmers = numpy.array([events[i:i+dim]
+                             for i in range(0, len(events)-dim+1, step)])
         return kmers
 
     def scale_events(self, events, sds=None):
@@ -298,8 +300,8 @@ class Mappings(object):
 
     The class defines several operations on these mappings.
     """
-    def __init__(self, readlocs, idxlocs, dists, nearestdmers, referenceLen,
-                 readlen, complement=False):
+    def __init__(self, readlocs, idxlocs, dists, nearestdmers, nmatches,
+                 referenceLen, readlen, complement=False):
         """
         Initializes a mapping.
         Inputs:
@@ -316,6 +318,7 @@ class Mappings(object):
         self.idx_locs = idxlocs
         self.dists = dists
         self.nearest_dmers = nearestdmers
+        self.nmatches = nmatches
         self.reflen = referenceLen
         self.readlen = readlen
         self.complement = complement
@@ -500,10 +503,12 @@ class KDTreeIndex(SpatialIndex):
                                 dtype=numpy.int)
         idx_locs = numpy.array([idx for match in results for idx in match.idx_locs],
                                dtype=numpy.int)
+        nmatches = numpy.array([len(match_idx.locs) for match in results for idx in match.idx_locs],
+                               dtype=numpy.int)
         nearests = numpy.array([match.nearestDmer for match in results for idx in match.idx_locs],
                                dtype=numpy.float32)
 
-        return Mappings(read_locs, idx_locs, dists, nearests,
+        return Mappings(read_locs, idx_locs, dists, nearests, nmatches,
                         referenceLen=self.reference_length, readlen=len(read_dmers))
 
     def __getstate__(self):
