@@ -1,13 +1,13 @@
 #!/bin/bash 
 # demo script for running the simple squiggle quasi-mapper 
 
-REFERENCE=ecoli.fa
+readonly REFERENCE=ecoli.fa
 
 function makeindex {
 # build a kd-tree index given a reference and a pore model, and a given dimensionality d
-    model=$1
-    indexfile=$2
-    dimension=${3-8}
+    local model=$1
+    local indexfile=$2
+    local dimension=${3-8}
 
     if [ ! -f ${indexfile}.kdtidx ]
     then
@@ -20,10 +20,10 @@ function makeindex {
 function mapreads {
 # map a list of reads given the provided indices
     declare -a input=("${!1}")
-    output=$2
-    template_idx=$3
-    complement_idx=$4
-    template_as_complement=$5
+    local output=$2
+    local template_idx=$3
+    local complement_idx=$4
+    local template_as_complement=$5
 
     if [ ! -f $output ] 
     then
@@ -53,8 +53,9 @@ function mapreads {
 
 function niceoutput {
 # merge the output of mapreads with the known results to print a nice summary table
-    filename=$1
-    bwaout=$2
+    local filename=$1
+    local bwaout=$2
+    local oldlang=$LANG
     export LANG=en_EN   # for sort, join
 
     join <( sort -k1 $bwaout) \
@@ -65,6 +66,7 @@ function niceoutput {
        | awk 'function dist(p1,p2) {size=4641648; d=p1-p2; if (d<0) d=-d; if (d*2 > size) d=size-d; return d;} \
               {d=dist($2,$4); printf "%s\tDifference\t%d\tBWA\t%d\t%s\t%d\tzscore\t%f\n",$1,d,$2,"kDTree",$4,$5}' \
        | sort -k3n | column -t
+    export LANG=${oldlang}
 }
 
 
