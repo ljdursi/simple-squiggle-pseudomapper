@@ -7,9 +7,11 @@ Using kd-tree index, map ONT fast5 reads to bacterial genomes
 """
 import argparse
 import numpy
+import scipy.stats
 import matplotlib.pylab
 import fast5
 import os
+import collections
 try:
     import cPickle as pickle
 except ImportError:
@@ -193,9 +195,14 @@ def start_bin_scores(mappings, binsize, map_range=None, return_bins=False):
     rangemin = map_range[0]
     rangemax = map_range[1]
 
-    # for this very simple model, each mapping contributes 1/dist^2
-    # worth of scores to the bin
-    contributions = 1./(mappings.dists*mappings.dists+.1)
+    contributions = scipy.stats.norm.pdf(mappings.dmers, mappings.nearest_dmers)
+    contributions = numpy.product(contributions, 1)/mappings.nmatches
+    totals = collections.defaultdict(float)
+    for loc, val in zip(mappings.read_locs, contributions):
+        totals[loc] += val
+    for i, loc in enumerate(mappings.read_locs):
+        contributions[i] /= (totals[loc]+1.e-9)
+
     starts = mappings.starts
 
     scorebins = numpy.arange(rangemin, rangemax+binsize-1, binsize)

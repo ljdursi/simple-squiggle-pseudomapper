@@ -300,7 +300,7 @@ class Mappings(object):
 
     The class defines several operations on these mappings.
     """
-    def __init__(self, readlocs, idxlocs, dists, nearestdmers, nmatches,
+    def __init__(self, readlocs, idxlocs, dists, dmers, nearestdmers, nmatches,
                  referenceLen, readlen, complement=False):
         """
         Initializes a mapping.
@@ -317,6 +317,7 @@ class Mappings(object):
         self.read_locs = readlocs
         self.idx_locs = idxlocs
         self.dists = dists
+        self.dmers = dmers
         self.nearest_dmers = nearestdmers
         self.nmatches = nmatches
         self.reflen = referenceLen
@@ -378,7 +379,9 @@ class Mappings(object):
             return Mappings(numpy.concatenate((self.read_locs, other.read_locs)),
                             numpy.concatenate((self.idx_locs, other.idx_locs)),
                             numpy.concatenate((self.dists, other.dists)),
+                            numpy.concatenate((self.dmers, other.dmers)),
                             numpy.concatenate((self.nearest_dmers, other.nearest_dmers)),
+                            numpy.concatenate((self.nmatches, other.nmatches)),
                             self.reflen,
                             self.readlen+other.readlen,
                             self.complement)
@@ -389,7 +392,9 @@ class Mappings(object):
                             numpy.concatenate((template.idx_locs,
                                                complement.coords_compl_to_templ(complement.idx_locs))),
                             numpy.concatenate((template.dists, complement.dists)),
+                            numpy.concatenate((self.dmers, other.dmers)),
                             numpy.concatenate((template.nearest_dmers, complement.nearest_dmers)),
+                            numpy.concatenate((self.nmatches, other.nmatches)),
                             template.reflen,
                             template.readlen,
                             False)
@@ -419,8 +424,8 @@ class Mappings(object):
         dists = numpy.sqrt(numpy.sum((new_dmers[self.read_locs, :] - self.nearest_dmers)*\
                                      (new_dmers[self.read_locs, :] - self.nearest_dmers), axis=1))
 
-        return Mappings(self.read_locs, self.idx_locs, dists, self.nearest_dmers,
-                        reflen, self.readlen, self.complement), fit
+        return Mappings(self.read_locs, self.idx_locs, dists, self.dmers, self.nearest_dmers,
+                        self.nmatches, reflen, self.readlen, self.complement), fit
 
 
 class KDTreeIndex(SpatialIndex):
@@ -503,12 +508,14 @@ class KDTreeIndex(SpatialIndex):
                                 dtype=numpy.int)
         idx_locs = numpy.array([idx for match in results for idx in match.idx_locs],
                                dtype=numpy.int)
-        nmatches = numpy.array([len(match_idx.locs) for match in results for idx in match.idx_locs],
+        nmatches = numpy.array([len(match.idx_locs) for match in results for idx in match.idx_locs],
                                dtype=numpy.int)
         nearests = numpy.array([match.nearestDmer for match in results for idx in match.idx_locs],
                                dtype=numpy.float32)
+        dmers = numpy.array([read_dmers[match.readLoc] for match in results for idx in match.idx_locs],
+                               dtype=numpy.float32)
 
-        return Mappings(read_locs, idx_locs, dists, nearests, nmatches,
+        return Mappings(read_locs, idx_locs, dists, dmers, nearests, nmatches,
                         referenceLen=self.reference_length, readlen=len(read_dmers))
 
     def __getstate__(self):
