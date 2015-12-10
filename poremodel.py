@@ -52,8 +52,10 @@ class PoreModel(object):
             calltype = "template"
         path = "/Analyses/Basecall_2D_000/"+calls+calltype+"/Model"
         if not path in fast5:
+            path = "/Analyses/Basecall_1D_000/"+calls+calltype+"/Model"
+        if not path in fast5:
             raise KeyError("Not found: "+path)
-        model_table = fast5["Analyses"]["Basecall_2D_000"][calls+calltype]["Model"]
+        model_table = fast5[path]
 
         level_mean = {}
         level_stdv = {}
@@ -177,8 +179,16 @@ class PoreModel(object):
         return events*events_scale + events_shift
 
     def means(self):
-        """Returns the level means of the model as a 1d list"""
-        return list(self.__level_mean.values())
+        """Returns the level means of the model as an array"""
+        return numpy.array(self.__level_mean.values())
+
+    def sds(self):
+        """Returns the level sds of the model as an array"""
+        return numpy.array(self.__level_stdv.values())
+
+    def kmers(self):
+        """Returns the level sds of the model as an array"""
+        return numpy.array(self.__level_mean.keys())
 
 
 def extractmodel():

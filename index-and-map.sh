@@ -21,30 +21,37 @@ function mapreads {
 # map a list of reads given the provided indices
     declare -a input=("${!1}")
     local output=$2
-    local template_idx=$3
-    local complement_idx=$4
-    local template_as_complement=$5
+    local closest=$3
+    local template_idx=$4
+    local complement_idx=$5
+    local template_as_complement=$6
 
     if [ ! -f $output ] 
     then
         echo "Mapping reads: starting with ${input}"
-        if [ ! -z "$4" ]
+        if [ ! -z "$complement_idx" ]
         then
-            complementoption="--complementindex"
+            local complementoption="--complementindex"
         else
-            complementoption=""
+            local complementoption=""
         fi
-        if [ ! -z "$5" ]
+        if [ ! -z "$template_as_complement" ]
         then
-            template_as_complement="--templateascomplement"
+            local template_as_complement="--templateascomplement"
+        fi
+        if [ "$closest" = true ]
+        then
+            closest=--closest
+        else
+            closest=""
         fi
 
-        echo "time python ./mapread.py --plot save --plotdir plots --closest --maxdist 3 "\
+        echo "time python ./mapread.py --plot save --plotdir plots ${closest} --maxdist 3 "\
                 "--templateindex ${template_idx} "\
                 "${complementoption} ${complement_idx}" \
                 "$input ...  > $output"
 
-        time python ./mapread.py --plot save --plotdir plots --closest --maxdist 3 \
+        time python ./mapread.py --plot save --plotdir plots ${closest} --maxdist 3 \
                 --templateindex ${template_idx} \
                 ${complementoption} ${complement_idx} \
                 ${input[@]} > $output
@@ -69,45 +76,69 @@ function niceoutput {
     export LANG=${oldlang}
 }
 
+main () {
+    local closest=true
+    local complement=true
+    for var in "${ARGS[@]}"
+    do
+        if [ "$var" = "noclosest" ]
+        then
+            closest=false
+        fi
+        if [ "$var" = "templateonly" ] || [ "$var" = "nocomplement" ]
+        then
+            complement=false
+        fi
+    done
 
-mkdir -p plots
-mkdir -p indices
 
-echo 
-echo "5mer data: "
-echo 
+    mkdir -p plots
+    mkdir -p indices
 
-makeindex models/5mer/template.model indices/ecoli-5mer-template 8
-makeindex models/5mer/complement.model indices/ecoli-5mer-complement 8
+    echo 
+    echo "5mer data: "
+    echo 
 
-FILES=($( ls ecoli/005/*fast5 ))
-mapreads FILES[@] template-only-005.txt indices/ecoli-5mer-template.kdtidx 
-mapreads FILES[@] template-complement-005.txt indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
+    makeindex models/5mer/template.model indices/ecoli-5mer-template 8
+    makeindex models/5mer/complement.model indices/ecoli-5mer-complement 8
 
-echo "Template Only Alignments"
-niceoutput template-only-005.txt ecoli/005/bwamem-ecoli-map-locations.txt
+    FILES=($( ls ecoli/005/*fast5 ))
 
-echo ""
-echo "Template+Complement Alignements"
-niceoutput template-complement-005.txt ecoli/005/bwamem-ecoli-map-locations.txt
+    mapreads FILES[@] template-only-005.txt $closest indices/ecoli-5mer-template.kdtidx 
+    echo "Template Only Alignments"
+    niceoutput template-only-005.txt ecoli/005/bwamem-ecoli-map-locations.txt 
 
-echo
-echo
-echo "6mer data: "
-echo 
+    if [ "$complement" = true ]
+    then
+        mapreads FILES[@] template-complement-005.txt $closest indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
+        echo ""
+        echo "Template+Complement Alignements"
+        niceoutput template-complement-005.txt ecoli/005/bwamem-ecoli-map-locations.txt
+    fi
 
-makeindex models/6mer/template.model indices/ecoli-6mer-template 7
-makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 7
-makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 7
+    echo
+    echo
+    echo "6mer data: "
+    echo 
 
-FILES=($( ls ecoli/006/*fast5 ))
-mapreads FILES[@] template-only-006.txt indices/ecoli-6mer-template.kdtidx
-mapreads FILES[@] template-complement-006.txt indices/ecoli-6mer-template.kdtidx\
-    indices/ecoli-6mer-complement_pop1.kdtidx,indices/ecoli-6mer-complement_pop2.kdtidx
+    makeindex models/6mer/template.model indices/ecoli-6mer-template 7
+    makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 7
+    makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 7
 
-echo "Template Only Alignments"
-niceoutput template-only-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
+    FILES=($( ls ecoli/006/*fast5 ))
+    mapreads FILES[@] template-only-006.txt $closest indices/ecoli-6mer-template.kdtidx 
+    echo "Template Only Alignments"
+    niceoutput template-only-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
 
-echo ""
-echo "Template+Complement Alignements"
-niceoutput template-complement-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
+    if [ "$complement" = true ]
+    then
+        mapreads FILES[@] template-complement-006.txt $closest indices/ecoli-6mer-template.kdtidx\
+            indices/ecoli-6mer-complement_pop1.kdtidx,indices/ecoli-6mer-complement_pop2.kdtidx
+        echo ""
+        echo "Template+Complement Alignements"
+        niceoutput template-complement-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
+    fi
+}
+
+readonly -a ARGS=("$@")
+main

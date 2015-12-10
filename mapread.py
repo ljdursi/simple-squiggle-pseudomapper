@@ -165,7 +165,7 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest, complement=False):
              list of mappings
              read length
     """
-    read = fast5.readevents(infile, complement=complement)
+    read, _, _, _ = fast5.readevents(infile, complement=complement)
     readlen = len(read)
 
     scaledreads = [index.scale_events(read) for index in indexes if index is not None]

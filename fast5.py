@@ -4,13 +4,15 @@ Simple HDF5 Fast5 accessor routines
 import h5py
 import numpy
 
-def read_basecalled_events(filename, complement=False, include_stds=False):
+def read_basecalled_events(filename, complement=False):
     """
     Read basecalled events from FAST5 file
     Returns numpy array of events levels, and optionally of std deviations
     """
     events = []
     sds = []
+    times = []
+    kmers = []
     fast5 = h5py.File(filename, "r")
     calls = "BaseCalled_"
     if complement:
@@ -25,14 +27,16 @@ def read_basecalled_events(filename, complement=False, include_stds=False):
     data = fast5[path]
     for row in data:
         events.append(row[0])
+        times.append(row[1])
         sds.append(row[2])
+        kmers.append(row[4])
 
-    if include_stds:
-        return (numpy.array(events, dtype=numpy.float32), numpy.array(sds, dtype=numpy.float32))
-    else:
-        return numpy.array(events, dtype=numpy.float32)
+    return (numpy.array(events, dtype=numpy.float32),
+            numpy.array(times, dtype=numpy.float32),
+            numpy.array(sds, dtype=numpy.float32),
+            kmers)
 
-def read_raw_events(filename, complement=False, include_stds=False):
+def read_raw_events(filename, complement=False):
     """
     Read raw events from FAST5 file
     Returns numpy array of events levels, and optionally of std deviations
@@ -76,19 +80,19 @@ def read_raw_events(filename, complement=False, include_stds=False):
         events = events[hairpin_index+80:]
         sds = sds[hairpin_index+80:]
 
-    if include_stds:
-        return events, sds
-    else:
-        return events
+    return (numpy.array(events, dtype=numpy.float32),
+            None,
+            numpy.array(sds, dtype=numpy.float32),
+            None)
 
-def readevents(filename, complement=False, include_stds=False):
+def readevents(filename, complement=False):
     """
     Read events from FAST5 file - template strand by default
     Attempt basecalled events first, and otherwise return raw events
     Returns numpy array of events levels, and optionally of std deviations
     """
     try:
-        result = read_basecalled_events(filename, complement, include_stds)
+        result = read_basecalled_events(filename, complement)
     except KeyError:
-        result = read_raw_events(filename, complement, include_stds)
+        result = read_raw_events(filename, complement)
     return result
