@@ -550,7 +550,7 @@ def main():
     parser = argparse.ArgumentParser(description="Build a KDTree index of reference given a pore model")
 
     parser.add_argument('reference', type=str, help="Reference FASTA")
-    parser.add_argument('modelfile', type=str, help="Pore model file")
+    parser.add_argument('modelfile', type=str, help="Pore model file (CSV or Fast5)")
     parser.add_argument('outfile', type=str, help="Output file prefix to save (pickled) index")
     parser.add_argument('-D', '--dimension', type=int, default=10,
                         help="Number of dimensions to use in spatial index")
@@ -561,8 +561,6 @@ def main():
                         help="Use Complement model rather than Template (from 2D Fast5 files only)")
     parser.add_argument('-d', '--delimiter', default=",", type=str,
                         help="Pore model delimeter (for CSV/TSV files only)")
-    parser.add_argument('-w', '--boxwidth', default=2., type=float,
-                        help="box size (in std dev) for rtree entries")
 
     args = parser.parse_args()
 
