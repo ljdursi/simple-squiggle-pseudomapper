@@ -7,7 +7,7 @@ import numpy
 def read_basecalled_events(filename, complement=False):
     """
     Read basecalled events from FAST5 file
-    Returns numpy array of events levels, and optionally of std deviations
+    Returns numpy array of events levels, start times, std deviations, and kmers
     """
     events = []
     sds = []
@@ -39,7 +39,8 @@ def read_basecalled_events(filename, complement=False):
 def read_raw_events(filename, complement=False):
     """
     Read raw events from FAST5 file
-    Returns numpy array of events levels, and optionally of std deviations
+    Returns numpy array of events levels, start times (currently None),
+    std deviations, and None (no kmers available)
     """
     events = []
     sds = []

@@ -10,6 +10,7 @@ import numpy
 import scipy.stats
 import matplotlib.pylab
 import fast5
+import em_rescale
 import os
 import collections
 try:
@@ -26,6 +27,8 @@ def main():
     parser.add_argument('infile', nargs="+", type=str, help="Input file[s] to map")
     parser.add_argument('-x', '--suffix', type=str, default="", help="suffix for plot file names")
     parser.add_argument('-D', '--plotdir', type=str, default=".", help="directory for plots")
+    parser.add_argument('-r', '--rescale', action="store_true",
+                        help="Rescale read based on EM method (quite expensive)")
     parser.add_argument('-b', '--binsize', type=int, default=10000,
                         help="bin size for approximate locations on reference")
     parser.add_argument('-T', '--templateindex', type=str,
@@ -70,10 +73,12 @@ def main():
     for infile in args.infile:
         try:
             reads_templ, maps_templ, readlen = reads_maps_from_fast5(infile, templ_idxs,
-                                                                     args.maxdist, args.closest)
+                                                                     args.maxdist, args.closest,
+                                                                     emrescale=args.rescale)
             reads_compl, maps_compl, _ = reads_maps_from_fast5(infile, compl_idxs,
                                                                args.maxdist, args.closest,
-                                                               complement=True)
+                                                               complement=True,
+                                                               emrescale=args.rescale)
             maps_compl = maps_compl + [None]
 
         except KeyError:
@@ -154,7 +159,8 @@ def main():
             matplotlib.pylab.clf()
 
 
-def reads_maps_from_fast5(infile, indexes, maxdist, closest, complement=False):
+def reads_maps_from_fast5(infile, indexes, maxdist, closest,
+                          complement=False, emrescale=False):
     """
     Given a list of indexes and a fast5 filename, read the
     file, scale it to the indices, and perform a lookup on each.
@@ -165,10 +171,23 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest, complement=False):
              list of mappings
              read length
     """
-    read, _, _, _ = fast5.readevents(infile, complement=complement)
+    read, times, _, _ = fast5.readevents(infile, complement=complement)
     readlen = len(read)
 
-    scaledreads = [index.scale_events(read) for index in indexes if index is not None]
+    if emrescale:
+        scaledreads = []
+        for index in indexes:
+            if index is None:
+                continue
+            model = index.model
+            level_means = model.means()
+            level_sds = model.sds()
+            level_kmers = model.kmers()
+            shift, scale, drift, _, _ = em_rescale.rescale(read, times, level_means, level_sds, level_kmers)
+            scaledreads.append((read - shift - drift*times)/scale)
+    else:
+        scaledreads = [index.scale_events(read) for index in indexes
+                       if index is not None]
     mappings = [index.lookup(index.events_to_dmer_array(scaledread, each_dmer=True),
                              maxdist=maxdist, closest=closest)
                 for scaledread, index in zip(scaledreads, indexes) if index is not None]

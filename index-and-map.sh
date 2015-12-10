@@ -22,9 +22,10 @@ function mapreads {
     declare -a input=("${!1}")
     local output=$2
     local closest=$3
-    local template_idx=$4
-    local complement_idx=$5
-    local template_as_complement=$6
+    local rescale=$4
+    local template_idx=$5
+    local complement_idx=$6
+    local template_as_complement=$7
 
     if [ ! -f $output ] 
     then
@@ -45,13 +46,19 @@ function mapreads {
         else
             closest=""
         fi
+        if [ "$rescale" = true ]
+        then
+            rescale=--rescale
+        else
+            rescale=""
+        fi
 
-        echo "time python ./mapread.py --plot save --plotdir plots ${closest} --maxdist 3 "\
+        echo "time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} --maxdist 3 "\
                 "--templateindex ${template_idx} "\
                 "${complementoption} ${complement_idx}" \
                 "$input ...  > $output"
 
-        time python ./mapread.py --plot save --plotdir plots ${closest} --maxdist 3 \
+        time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} --maxdist 3 \
                 --templateindex ${template_idx} \
                 ${complementoption} ${complement_idx} \
                 ${input[@]} > $output
@@ -79,6 +86,7 @@ function niceoutput {
 main () {
     local closest=true
     local complement=true
+    local rescale=false
     for var in "${ARGS[@]}"
     do
         if [ "$var" = "noclosest" ]
@@ -88,6 +96,10 @@ main () {
         if [ "$var" = "templateonly" ] || [ "$var" = "nocomplement" ]
         then
             complement=false
+        fi
+        if [ "$var" = "rescale" ] || [ "$var" = "rescale" ]
+        then
+            rescale=true
         fi
     done
 
@@ -100,17 +112,17 @@ main () {
     echo 
 
     makeindex models/5mer/template.model indices/ecoli-5mer-template 8
-    makeindex models/5mer/complement.model indices/ecoli-5mer-complement 8
 
     FILES=($( ls ecoli/005/*fast5 ))
 
-    mapreads FILES[@] template-only-005.txt $closest indices/ecoli-5mer-template.kdtidx 
+    mapreads FILES[@] template-only-005.txt $closest $rescale indices/ecoli-5mer-template.kdtidx 
     echo "Template Only Alignments"
     niceoutput template-only-005.txt ecoli/005/bwamem-ecoli-map-locations.txt 
 
     if [ "$complement" = true ]
     then
-        mapreads FILES[@] template-complement-005.txt $closest indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
+        makeindex models/5mer/complement.model indices/ecoli-5mer-complement 8
+        mapreads FILES[@] template-complement-005.txt $closest $rescale indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
         echo ""
         echo "Template+Complement Alignements"
         niceoutput template-complement-005.txt ecoli/005/bwamem-ecoli-map-locations.txt
@@ -122,17 +134,17 @@ main () {
     echo 
 
     makeindex models/6mer/template.model indices/ecoli-6mer-template 7
-    makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 7
-    makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 7
 
     FILES=($( ls ecoli/006/*fast5 ))
-    mapreads FILES[@] template-only-006.txt $closest indices/ecoli-6mer-template.kdtidx 
+    mapreads FILES[@] template-only-006.txt $closest $rescale indices/ecoli-6mer-template.kdtidx 
     echo "Template Only Alignments"
     niceoutput template-only-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
 
     if [ "$complement" = true ]
     then
-        mapreads FILES[@] template-complement-006.txt $closest indices/ecoli-6mer-template.kdtidx\
+        makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 7
+        makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 7
+        mapreads FILES[@] template-complement-006.txt $closest $rescale indices/ecoli-6mer-template.kdtidx\
             indices/ecoli-6mer-complement_pop1.kdtidx,indices/ecoli-6mer-complement_pop2.kdtidx
         echo ""
         echo "Template+Complement Alignements"
