@@ -23,9 +23,10 @@ function mapreads {
     local output=$2
     local closest=$3
     local rescale=$4
-    local template_idx=$5
-    local complement_idx=$6
-    local template_as_complement=$7
+    local extend=$5
+    local template_idx=$6
+    local complement_idx=$7
+    local template_as_complement=$8
 
     if [ ! -f $output ] 
     then
@@ -52,13 +53,19 @@ function mapreads {
         else
             rescale=""
         fi
+        if [ "$extend" = true ]
+        then
+            extend=--extend
+        else
+            extend=""
+        fi
 
-        echo "time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} --maxdist 3 "\
+        echo "time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} ${extend} --maxdist 3 "\
                 "--templateindex ${template_idx} "\
                 "${complementoption} ${complement_idx}" \
                 "$input ...  > $output"
 
-        time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} --maxdist 3 \
+        time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} ${extend} --maxdist 3 \
                 --templateindex ${template_idx} \
                 ${complementoption} ${complement_idx} \
                 ${input[@]} > $output
@@ -87,6 +94,7 @@ main () {
     local closest=true
     local complement=true
     local rescale=false
+    local extend=true
     for var in "${ARGS[@]}"
     do
         if [ "$var" = "noclosest" ]
@@ -97,9 +105,13 @@ main () {
         then
             complement=false
         fi
-        if [ "$var" = "rescale" ] || [ "$var" = "rescale" ]
+        if [ "$var" = "rescale" ] || [ "$var" = "emrescale" ]
         then
             rescale=true
+        fi
+        if [ "$var" = "extend" ]
+        then
+            extend=true
         fi
     done
 
@@ -115,14 +127,15 @@ main () {
 
     FILES=($( ls ecoli/005/*fast5 ))
 
-    mapreads FILES[@] template-only-005.txt $closest $rescale indices/ecoli-5mer-template.kdtidx 
+    mapreads FILES[@] template-only-005.txt $closest $rescale $extend indices/ecoli-5mer-template.kdtidx 
     echo "Template Only Alignments"
     niceoutput template-only-005.txt ecoli/005/bwamem-ecoli-map-locations.txt 
 
     if [ "$complement" = true ]
     then
         makeindex models/5mer/complement.model indices/ecoli-5mer-complement 8
-        mapreads FILES[@] template-complement-005.txt $closest $rescale indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
+        mapreads FILES[@] template-complement-005.txt $closest $rescale $extend\
+            indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
         echo ""
         echo "Template+Complement Alignements"
         niceoutput template-complement-005.txt ecoli/005/bwamem-ecoli-map-locations.txt
@@ -136,7 +149,7 @@ main () {
     makeindex models/6mer/template.model indices/ecoli-6mer-template 7
 
     FILES=($( ls ecoli/006/*fast5 ))
-    mapreads FILES[@] template-only-006.txt $closest $rescale indices/ecoli-6mer-template.kdtidx 
+    mapreads FILES[@] template-only-006.txt $closest $rescale $extend indices/ecoli-6mer-template.kdtidx 
     echo "Template Only Alignments"
     niceoutput template-only-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
 
@@ -144,7 +157,7 @@ main () {
     then
         makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 7
         makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 7
-        mapreads FILES[@] template-complement-006.txt $closest $rescale indices/ecoli-6mer-template.kdtidx\
+        mapreads FILES[@] template-complement-006.txt $closest $rescale $extend indices/ecoli-6mer-template.kdtidx\
             indices/ecoli-6mer-complement_pop1.kdtidx,indices/ecoli-6mer-complement_pop2.kdtidx
         echo ""
         echo "Template+Complement Alignements"

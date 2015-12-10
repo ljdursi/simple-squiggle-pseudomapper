@@ -29,6 +29,8 @@ def main():
     parser.add_argument('-D', '--plotdir', type=str, default=".", help="directory for plots")
     parser.add_argument('-r', '--rescale', action="store_true",
                         help="Rescale read based on EM method (quite expensive)")
+    parser.add_argument('-e', '--extend', action="store_true",
+                        help="Map based on fixed-length extended seeds found")
     parser.add_argument('-b', '--binsize', type=int, default=10000,
                         help="bin size for approximate locations on reference")
     parser.add_argument('-T', '--templateindex', type=str,
@@ -69,6 +71,8 @@ def main():
     # reference length
     reflen = templ_idxs[0].reference_length
 
+    # number of bases per dmer = k+dimension-1
+    nbases = templ_idxs[0].dimension + templ_idxs[0].model.k - 1
 
     for infile in args.infile:
         try:
@@ -90,8 +94,12 @@ def main():
         # For each set of mappings for the current read, calculate the
         # weighted scores for starting in each bin on the reference
         best = []
-        templ_bins = [start_bin_scores(template, binsize) for template in maps_templ]
-        compl_bins = [start_bin_scores(complement, binsize) for complement in maps_compl]
+        if not args.extend:
+            templ_bins = [start_bin_scores(template, binsize) for template in maps_templ]
+            compl_bins = [start_bin_scores(complement, binsize) for complement in maps_compl]
+        else:
+            templ_bins = [start_bin_scores_extension(template, binsize, nbases) for template in maps_templ]
+            compl_bins = [start_bin_scores_extension(complement, binsize, nbases) for complement in maps_compl]
 
         # Find the combination of template+complement models which
         # produce the highest-scoring localizations
@@ -198,6 +206,22 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest,
 
     return scaledreads, mappings, readlen
 
+def mapping_scores(mappings):
+    """
+    Returns a score for each mapping 
+    """
+    if mappings is None:
+        return numpy.array([])
+
+    contributions = scipy.stats.norm.pdf(mappings.dmers, mappings.nearest_dmers)
+    contributions = numpy.product(contributions, 1)/mappings.nmatches
+    totals = collections.defaultdict(float)
+    for loc, val in zip(mappings.read_locs, contributions):
+        totals[loc] += val
+    for i, loc in enumerate(mappings.read_locs):
+        contributions[i] /= (totals[loc]+1.e-9)
+
+    return contributions
 
 def start_bin_scores(mappings, binsize, map_range=None, return_bins=False):
     """
@@ -214,15 +238,63 @@ def start_bin_scores(mappings, binsize, map_range=None, return_bins=False):
     rangemin = map_range[0]
     rangemax = map_range[1]
 
-    contributions = scipy.stats.norm.pdf(mappings.dmers, mappings.nearest_dmers)
-    contributions = numpy.product(contributions, 1)/mappings.nmatches
-    totals = collections.defaultdict(float)
-    for loc, val in zip(mappings.read_locs, contributions):
-        totals[loc] += val
-    for i, loc in enumerate(mappings.read_locs):
-        contributions[i] /= (totals[loc]+1.e-9)
-
+    contributions = mapping_scores(mappings)
     starts = mappings.starts
+
+    scorebins = numpy.arange(rangemin, rangemax+binsize-1, binsize)
+    scores, _ = numpy.histogram(starts, bins=scorebins, weights=contributions)
+
+    if return_bins:
+        return scores, scorebins
+    else:
+        return scores
+
+def start_bin_scores_extension(mappings, binsize, nbases,
+                               nextend=4, nskip=2,
+                               skip_prob=0.2, stay_prob=0.1,
+                               map_range=None, return_bins=False):
+    """
+    Returns a bin of scores representing a liklihood of the read beginning
+    within that bin of reference positions.
+    """
+    if mappings is None:
+        return 0.
+
+    reflen = mappings.reflen
+    if map_range is None:
+        map_range = [-reflen, reflen+1]
+
+    rangemin = map_range[0]
+    rangemax = map_range[1]
+
+    contributions = mapping_scores(mappings)
+
+    lookup = collections.defaultdict(lambda: collections.defaultdict(float))
+    startpos = collections.defaultdict(lambda: collections.defaultdict(int))
+
+    for readpos, refpos, start, score in zip(mappings.read_locs, mappings.idx_locs, mappings.starts, contributions):
+        lookup[readpos][refpos] = score
+        startpos[readpos][refpos] = start
+    
+    def findextension(readpos, refpos, nextend, nskip):
+        val = lookup[readpos][refpos]
+        if val == 0. or nextend == 0:
+            return val
+        move = findextension(readpos+1, refpos+1, nextend-1, nskip) 
+        skip = 0 if nskip == 0 else findextension(readpos+nbases, refpos+nbases-1, nextend-1, nskip-1)*skip_prob
+        stay = 0 if nskip == 0 else findextension(readpos+nbases-1, refpos+nbases, nextend-1, nskip-1)*stay_prob
+        best = max([move, skip, stay])
+        return val*best
+
+    extendedscores = [(start, findextension(readpos, refpos, nextend, nskip))
+                      for readpos, refpos, start in zip(mappings.read_locs, mappings.idx_locs, mappings.starts)]
+    extendedscores = filter(lambda x:x[1] > 0., extendedscores)
+
+    if len(extendedscores) == 0:
+        starts = mappings.starts
+        print("Warning - could not generate sufficiently large extensions")
+    else:
+        starts, contributions = zip(*extendedscores)
 
     scorebins = numpy.arange(rangemin, rangemax+binsize-1, binsize)
     scores, _ = numpy.histogram(starts, bins=scorebins, weights=contributions)
