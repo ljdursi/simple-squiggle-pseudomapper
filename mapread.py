@@ -120,7 +120,8 @@ def main():
 
         best.sort()
         best = best[-nbest:][::-1]
-        print("Best locations: ", [(b[0], b[2], b[3], b[4]) for b in best])
+        print(os.path.splitext(infile)[0]+" top locations: "+
+              str([(b[0], b[2], b[3], b[4]) for b in best]))
 
         zscore, bestidx, map_range, idx_templ, idx_compl, scores = best[0]
         mappings_templ = maps_templ[idx_templ]
@@ -133,23 +134,14 @@ def main():
         strand = "template"
         if args.usecomplement:
             strand = "template+complement"
-        if not args.plot == "stats-only":
-            matplotlib.rcParams['font.size'] = 8
-            grid = matplotlib.gridspec.GridSpec(2, 1)
-            matplotlib.pylab.subplot(grid[0])
-            matplotlib.pylab.hist2d(allmappings.idx_locs, allmappings.read_locs,
-                                    weights=1./(allmappings.dists*allmappings.dists+0.1),
-                                    bins=[readlen/10, 2*reflen//binsize],
-                                    cmap=matplotlib.pylab.get_cmap('Blues'))
-            matplotlib.pylab.title(infile+": "+strand)
 
         print("%s %s Best location in bin %d,%d zscore = %f,%f" %
               (os.path.splitext(infile)[0], strand, bin_edges[bestidx],
                bin_edges[bestidx+2], zscore, scores[bestidx]))
 
         if not args.plot == "stats-only":
-            matplotlib.pylab.subplot(grid[1])
-            matplotlib.pylab.title("Starting position distribution")
+            matplotlib.rcParams['font.size'] = 8
+            matplotlib.pylab.title(infile+": "+strand)
             matplotlib.pylab.plot(bin_edges[bestidx], scores[bestidx], 'ro')
             matplotlib.pylab.plot(bin_edges[1:-1], scores, '.')
             matplotlib.pylab.xlim([-reflen, reflen])
@@ -249,7 +241,7 @@ def start_bin_scores(mappings, binsize, map_range=None, return_bins=False):
         return scores
 
 def start_bin_scores_extension(mappings, binsize, dim,
-                               nextend=2, nskip=1,
+                               nextend=3, nskip=1,
                                skip_prob=0.2, stay_prob=0.1,
                                map_range=None, return_bins=False):
     """
