@@ -72,7 +72,7 @@ def main():
     reflen = templ_idxs[0].reference_length
 
     # number of bases per dmer = k+dimension-1
-    nbases = templ_idxs[0].dimension + templ_idxs[0].model.k - 1
+    dim = templ_idxs[0].dimension
 
     for infile in args.infile:
         try:
@@ -98,8 +98,8 @@ def main():
             templ_bins = [start_bin_scores(template, binsize) for template in maps_templ]
             compl_bins = [start_bin_scores(complement, binsize) for complement in maps_compl]
         else:
-            templ_bins = [start_bin_scores_extension(template, binsize, nbases) for template in maps_templ]
-            compl_bins = [start_bin_scores_extension(complement, binsize, nbases) for complement in maps_compl]
+            templ_bins = [start_bin_scores_extension(template, binsize, dim) for template in maps_templ]
+            compl_bins = [start_bin_scores_extension(complement, binsize, dim) for complement in maps_compl]
 
         # Find the combination of template+complement models which
         # produce the highest-scoring localizations
@@ -124,7 +124,6 @@ def main():
 
         zscore, bestidx, map_range, idx_templ, idx_compl, scores = best[0]
         mappings_templ = maps_templ[idx_templ]
-        print(idx_compl)
         mappings_compl = maps_compl[idx_compl] if args.usecomplement else None
 
         allmappings = mappings_templ
@@ -249,8 +248,8 @@ def start_bin_scores(mappings, binsize, map_range=None, return_bins=False):
     else:
         return scores
 
-def start_bin_scores_extension(mappings, binsize, nbases,
-                               nextend=4, nskip=2,
+def start_bin_scores_extension(mappings, binsize, dim,
+                               nextend=2, nskip=1,
                                skip_prob=0.2, stay_prob=0.1,
                                map_range=None, return_bins=False):
     """
@@ -268,23 +267,24 @@ def start_bin_scores_extension(mappings, binsize, nbases,
     rangemax = map_range[1]
 
     contributions = mapping_scores(mappings)
+    move_prob = 1.-skip_prob-stay_prob
 
     lookup = collections.defaultdict(lambda: collections.defaultdict(float))
-    startpos = collections.defaultdict(lambda: collections.defaultdict(int))
 
     for readpos, refpos, start, score in zip(mappings.read_locs, mappings.idx_locs, mappings.starts, contributions):
         lookup[readpos][refpos] = score
-        startpos[readpos][refpos] = start
     
     def findextension(readpos, refpos, nextend, nskip):
         val = lookup[readpos][refpos]
         if val == 0. or nextend == 0:
             return val
-        move = findextension(readpos+1, refpos+1, nextend-1, nskip) 
-        skip = 0 if nskip == 0 else findextension(readpos+nbases, refpos+nbases-1, nextend-1, nskip-1)*skip_prob
-        stay = 0 if nskip == 0 else findextension(readpos+nbases-1, refpos+nbases, nextend-1, nskip-1)*stay_prob
+        delta_ref = +1 if refpos > 0 else -1
+        delta_read = +1 if readpos > 0 else -1
+        move = findextension(readpos+delta_read*1, refpos+delta_ref*1, nextend-1, nskip)*move_prob
+        skip = 0 if nskip == 0 else findextension(readpos+delta_read*(dim-1), refpos+delta_ref*dim, nextend-1, nskip-1)*skip_prob
+        stay = 0 if nskip == 0 else findextension(readpos+delta_read*dim, refpos+delta_ref*(dim-1), nextend-1, nskip-1)*stay_prob
         best = max([move, skip, stay])
-        return val*best
+        return min(best,val)
 
     extendedscores = [(start, findextension(readpos, refpos, nextend, nskip))
                       for readpos, refpos, start in zip(mappings.read_locs, mappings.idx_locs, mappings.starts)]
