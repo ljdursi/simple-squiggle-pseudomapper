@@ -28,14 +28,18 @@ function mapreads {
     local complement_idx=$7
     local template_as_complement=$8
 
+    local rescaleopt=""
+    local extendopt=""
+    local closestopt=""
+    local complementoption=""
+    local dist=3
+
     if [ ! -f $output ] 
     then
         echo "Mapping reads: starting with ${input}"
-        if [ ! -z "$complement_idx" ]
+        if [ ! -z "$complement_idx" ] 
         then
             local complementoption="--complementindex"
-        else
-            local complementoption=""
         fi
         if [ ! -z "$template_as_complement" ]
         then
@@ -43,29 +47,23 @@ function mapreads {
         fi
         if [ "$closest" = true ]
         then
-            closest=--closest
-        else
-            closest=""
+            closestopt=--closest
         fi
         if [ "$rescale" = true ]
         then
-            rescale=--rescale
-        else
-            rescale=""
+            rescaleopt=--rescale
         fi
         if [ "$extend" = true ]
         then
-            extend=--extend
-        else
-            extend=""
+            extendopt=--extend
         fi
 
-        echo "time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} ${extend} --maxdist 3 "\
+        echo "time python ./mapread.py --plot save --plotdir plots ${closestopt} ${rescaleopt} ${extendopt} --maxdist ${dist} "\
                 "--templateindex ${template_idx} "\
                 "${complementoption} ${complement_idx}" \
                 "$input ...  > $output"
 
-        time python ./mapread.py --plot save --plotdir plots ${closest} ${rescale} ${extend} --maxdist 3 \
+        time python ./mapread.py --plot save --plotdir plots ${closestopt} ${rescaleopt} ${extendopt} --maxdist ${dist} \
                 --templateindex ${template_idx} \
                 ${complementoption} ${complement_idx} \
                 ${input[@]} > $output
@@ -94,7 +92,7 @@ main () {
     local closest=true
     local complement=true
     local rescale=false
-    local extend=true
+    local extend=false
     for var in "${ARGS[@]}"
     do
         if [ "$var" = "noclosest" ]
