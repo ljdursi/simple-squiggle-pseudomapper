@@ -280,7 +280,7 @@ def start_bin_scores_extension(mappings, binsize, dim,
 
     extendedscores = [(start, findextension(readpos, refpos, nextend, nskip))
                       for readpos, refpos, start in zip(mappings.read_locs, mappings.idx_locs, mappings.starts)]
-    extendedscores = filter(lambda x:x[1] > 0., extendedscores)
+    extendedscores = [x for x in extendedscores if x[1] > 0.]
 
     if len(extendedscores) == 0:
         starts = mappings.starts

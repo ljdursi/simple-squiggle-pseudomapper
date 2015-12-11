@@ -180,15 +180,15 @@ class PoreModel(object):
 
     def means(self):
         """Returns the level means of the model as an array"""
-        return numpy.array(self.__level_mean.values())
+        return numpy.array(list(self.__level_mean.values()))
 
     def sds(self):
         """Returns the level sds of the model as an array"""
-        return numpy.array(self.__level_stdv.values())
+        return numpy.array(list(self.__level_stdv.values()))
 
     def kmers(self):
         """Returns the level sds of the model as an array"""
-        return numpy.array(self.__level_mean.keys())
+        return numpy.array(list(self.__level_mean.keys()))
 
 
 def extractmodel():
