@@ -77,14 +77,15 @@ function niceoutput {
     local oldlang=$LANG
     export LANG=en_EN   # for sort, join
 
-    join <( sort -k1 $bwaout) \
-         <(cat ${filename} | grep zscore | sed -e "s#^.*_ch#ch#" -e 's#_strand##' -e 's/,/ /g'| \
-            sed -e "s/_strand//" | \
-            awk '{size=4641648; mean=int(($7+$8)/2); if (mean < 0) mean=mean+size; printf "%s\t%s\t%d\t%8.3f\n",$1,$2,mean,$11}' | \
-            sort -k1) \
-       | awk 'function dist(p1,p2) {size=4641648; d=p1-p2; if (d<0) d=-d; if (d*2 > size) d=size-d; return d;} \
-              {d=dist($2,$4); printf "%s\tDifference\t%d\tBWA\t%d\t%s\t%d\tzscore\t%f\n",$1,d,$2,"kDTree",$4,$5}' \
-       | sort -k3n | column -t
+    join <( sort -k1 $bwaout ) \
+         <( cat ${filename} | grep zscore | sed -e "s#^.*_ch#ch#" -e 's#_strand##' -e 's/,/ /g'| \
+             sed -e "s/_strand//" | \
+             awk '{size=4641648; mean=int(($7+$8)/2); if (mean < 0) mean=mean+size; printf "%s\t%s\t%d\t%8.3f\n",$1,$2,mean,$11}' | \
+             sort -k1) \
+        | awk 'function dist(p1,p2) {size=4641648; d=p1-p2; if (d<0) d=-d; if (d*2 > size) d=size-d; return d;} \
+               BEGIN { print "Read\tDifference\tBWA\tKDTree\tzscore" } \
+               {d=dist($2,$4); printf "%s\t%d\t%d\t%d\t%f\n",$1,d,$2,$4,$5}' \
+        | sort -k2,2n | column -t
     export LANG=${oldlang}
 }
 
