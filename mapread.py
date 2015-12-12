@@ -76,13 +76,13 @@ def main():
 
     for infile in args.infile:
         try:
-            reads_templ, maps_templ, readlen = reads_maps_from_fast5(infile, templ_idxs,
-                                                                     args.maxdist, args.closest,
-                                                                     emrescale=args.rescale)
-            reads_compl, maps_compl, _ = reads_maps_from_fast5(infile, compl_idxs,
-                                                               args.maxdist, args.closest,
-                                                               complement=True,
-                                                               emrescale=args.rescale)
+            _, maps_templ, readlen = reads_maps_from_fast5(infile, templ_idxs,
+                                                           args.maxdist, args.closest,
+                                                           emrescale=args.rescale)
+            _, maps_compl, _ = reads_maps_from_fast5(infile, compl_idxs,
+                                                     args.maxdist, args.closest,
+                                                     complement=True,
+                                                     emrescale=args.rescale)
             maps_compl = maps_compl + [None]
 
         except KeyError:
@@ -98,8 +98,10 @@ def main():
             templ_bins = [start_bin_scores(template, binsize) for template in maps_templ]
             compl_bins = [start_bin_scores(complement, binsize) for complement in maps_compl]
         else:
-            templ_bins = [start_bin_scores_extension(template, binsize, dim) for template in maps_templ]
-            compl_bins = [start_bin_scores_extension(complement, binsize, dim) for complement in maps_compl]
+            templ_bins = [start_bin_scores_extension(template, binsize, dim)
+                          for template in maps_templ]
+            compl_bins = [start_bin_scores_extension(complement, binsize, dim)
+                          for complement in maps_compl]
 
         # Find the combination of template+complement models which
         # produce the highest-scoring localizations
@@ -123,13 +125,7 @@ def main():
         print(os.path.splitext(infile)[0]+" top locations: "+
               str([(b[0], b[2], b[3], b[4]) for b in best]))
 
-        zscore, bestidx, map_range, idx_templ, idx_compl, scores = best[0]
-        mappings_templ = maps_templ[idx_templ]
-        mappings_compl = maps_compl[idx_compl] if args.usecomplement else None
-
-        allmappings = mappings_templ
-        if mappings_compl is not None:
-            allmappings = mappings_templ.append(mappings_compl)
+        zscore, bestidx, _, _, _, scores = best[0]
 
         strand = "template"
         if args.usecomplement:
@@ -182,7 +178,9 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest,
             level_means = model.means()
             level_sds = model.sds()
             level_kmers = model.kmers()
-            shift, scale, drift, _, _ = em_rescale.rescale(read, times, level_means, level_sds, level_kmers)
+            shift, scale, drift, _, _ = em_rescale.rescale(read, times,
+                                                           level_means, level_sds,
+                                                           level_kmers)
             scaledreads.append((read - shift - drift*times)/scale)
     else:
         scaledreads = [index.scale_events(read) for index in indexes
@@ -199,7 +197,7 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest,
 
 def mapping_scores(mappings):
     """
-    Returns a score for each mapping 
+    Returns a score for each mapping
     """
     if mappings is None:
         return numpy.array([])
@@ -263,10 +261,16 @@ def start_bin_scores_extension(mappings, binsize, dim,
 
     lookup = collections.defaultdict(lambda: collections.defaultdict(float))
 
-    for readpos, refpos, start, score in zip(mappings.read_locs, mappings.idx_locs, mappings.starts, contributions):
+    for readpos, refpos, score in zip(mappings.read_locs, mappings.idx_locs, contributions):
         lookup[readpos][refpos] = score
-    
+
     def findextension(readpos, refpos, nextend, nskip):
+        """
+        Given the mappings and scores (in the dict-of-dicts lookup),
+        a starting mapping (readpos->refpos), the number to extend,
+        and the number of skips allowed, recursively extend the seed
+        with the best choice.
+        """
         val = lookup[readpos][refpos]
         if val == 0. or nextend == 0:
             return val
@@ -276,7 +280,7 @@ def start_bin_scores_extension(mappings, binsize, dim,
         skip = 0 if nskip == 0 else findextension(readpos+delta_read*(dim-1), refpos+delta_ref*dim, nextend-1, nskip-1)*skip_prob
         stay = 0 if nskip == 0 else findextension(readpos+delta_read*dim, refpos+delta_ref*(dim-1), nextend-1, nskip-1)*stay_prob
         best = max([move, skip, stay])
-        return min(best,val)
+        return min(best, val)
 
     extendedscores = [(start, findextension(readpos, refpos, nextend, nskip))
                       for readpos, refpos, start in zip(mappings.read_locs, mappings.idx_locs, mappings.starts)]
