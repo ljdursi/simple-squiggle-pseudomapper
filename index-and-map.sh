@@ -24,15 +24,17 @@ function mapreads {
     local closest=$3
     local rescale=$4
     local extend=$5
-    local template_idx=$6
-    local complement_idx=$7
-    local template_as_complement=$8
+    local longest=$6
+    local template_idx=$7
+    local complement_idx=$8
+    local template_as_complement=$9
 
     local rescaleopt=""
     local extendopt=""
     local closestopt=""
     local complementoption=""
-    local dist=3
+    local longestopt=""
+    local dist=3.5
 
     if [ ! -f $output ] 
     then
@@ -53,17 +55,21 @@ function mapreads {
         then
             rescaleopt=--rescale
         fi
+        if [ "$longest" = true ]
+        then
+            longestopt=--longest
+        fi
         if [ "$extend" = true ]
         then
-            extendopt=--extend
+            extendopt=--extend=3
         fi
 
-        echo "time python ./mapread.py --plot save --plotdir plots ${closestopt} ${rescaleopt} ${extendopt} --maxdist ${dist} "\
+        echo "time python ./mapread.py --plot save --plotdir plots ${closestopt} ${rescaleopt} ${extendopt} ${longestopt} --maxdist ${dist} "\
                 "--templateindex ${template_idx} "\
                 "${complementoption} ${complement_idx}" \
                 "$input ...  > $output"
 
-        time python ./mapread.py --plot save --plotdir plots ${closestopt} ${rescaleopt} ${extendopt} --maxdist ${dist} \
+        time python ./mapread.py --plot save --plotdir plots ${closestopt} ${rescaleopt} ${extendopt} ${longestopt} --maxdist ${dist} \
                 --templateindex ${template_idx} \
                 ${complementoption} ${complement_idx} \
                 ${input[@]} > $output
@@ -94,6 +100,7 @@ main () {
     local complement=true
     local rescale=false
     local extend=false
+    local longest=false
     for var in "${ARGS[@]}"
     do
         if [ "$var" = "noclosest" ]
@@ -103,6 +110,10 @@ main () {
         if [ "$var" = "templateonly" ] || [ "$var" = "nocomplement" ]
         then
             complement=false
+        fi
+        if [ "$var" = "longest" ] || [ "$var" = "nobin" ]
+        then
+            longest=true
         fi
         if [ "$var" = "rescale" ] || [ "$var" = "emrescale" ]
         then
@@ -126,14 +137,14 @@ main () {
 
     FILES=($( ls ecoli/005/*fast5 ))
 
-    mapreads FILES[@] template-only-005.txt $closest $rescale $extend indices/ecoli-5mer-template.kdtidx 
+    mapreads FILES[@] template-only-005.txt $closest $rescale $extend $longest indices/ecoli-5mer-template.kdtidx 
     echo "Template Only Alignments"
     niceoutput template-only-005.txt ecoli/005/bwamem-ecoli-map-locations.txt 
 
     if [ "$complement" = true ]
     then
         makeindex models/5mer/complement.model indices/ecoli-5mer-complement 8
-        mapreads FILES[@] template-complement-005.txt $closest $rescale $extend\
+        mapreads FILES[@] template-complement-005.txt $closest $rescale $extend $longest \
             indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
         echo ""
         echo "Template+Complement Alignements"
@@ -148,7 +159,7 @@ main () {
     makeindex models/6mer/template.model indices/ecoli-6mer-template 7
 
     FILES=($( ls ecoli/006/*fast5 ))
-    mapreads FILES[@] template-only-006.txt $closest $rescale $extend indices/ecoli-6mer-template.kdtidx 
+    mapreads FILES[@] template-only-006.txt $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx 
     echo "Template Only Alignments"
     niceoutput template-only-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
 
@@ -156,7 +167,7 @@ main () {
     then
         makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 7
         makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 7
-        mapreads FILES[@] template-complement-006.txt $closest $rescale $extend indices/ecoli-6mer-template.kdtidx\
+        mapreads FILES[@] template-complement-006.txt $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx\
             indices/ecoli-6mer-complement_pop1.kdtidx,indices/ecoli-6mer-complement_pop2.kdtidx
         echo ""
         echo "Template+Complement Alignements"
