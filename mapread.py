@@ -329,7 +329,6 @@ def start_bin_scores_extension(mappings, binsize, dim,
         print("Warning - could not generate sufficiently large extensions")
     else:
         starts, contributions = zip(*extendedscores)
->>>>>>> fd720e31d76c8043def63ae4edb84792bc7c3dfc
 
     scorebins = numpy.arange(rangemin, rangemax+binsize-1, binsize)
     scores, _ = numpy.histogram(starts, bins=scorebins, weights=scores)
