@@ -274,6 +274,7 @@ def extend_matches(mappings, binsize, dim,
         return zip(*extendedscores)
 
     return
+
 def start_bin_scores_extension(mappings, binsize, dim,
                                nextend=3, nskip=1,
                                skip_prob=0.2, stay_prob=0.1,
@@ -293,6 +294,42 @@ def start_bin_scores_extension(mappings, binsize, dim,
     rangemax = map_range[1]
 
     starts, _, _, scores = extend_matches(mappings, binsize, dim, nextend, nskip, skip_prob, stay_prob)
+    contributions = mapping_scores(mappings)
+    move_prob = 1.-skip_prob-stay_prob
+
+    lookup = collections.defaultdict(lambda: collections.defaultdict(float))
+
+    for readpos, refpos, score in zip(mappings.read_locs, mappings.idx_locs, contributions):
+        lookup[readpos][refpos] = score
+
+    def findextension(readpos, refpos, nextend, nskip):
+        """
+        Given the mappings and scores (in the dict-of-dicts lookup),
+        a starting mapping (readpos->refpos), the number to extend,
+        and the number of skips allowed, recursively extend the seed
+        with the best choice.
+        """
+        val = lookup[readpos][refpos]
+        if val == 0. or nextend == 0:
+            return val
+        delta_ref = +1 if refpos > 0 else -1
+        delta_read = +1 if readpos > 0 else -1
+        move = findextension(readpos+delta_read*1, refpos+delta_ref*1, nextend-1, nskip)*move_prob
+        skip = 0 if nskip == 0 else findextension(readpos+delta_read*(dim-1), refpos+delta_ref*dim, nextend-1, nskip-1)*skip_prob
+        stay = 0 if nskip == 0 else findextension(readpos+delta_read*dim, refpos+delta_ref*(dim-1), nextend-1, nskip-1)*stay_prob
+        best = max([move, skip, stay])
+        return min(best, val)
+
+    extendedscores = [(start, findextension(readpos, refpos, nextend, nskip))
+                      for readpos, refpos, start in zip(mappings.read_locs, mappings.idx_locs, mappings.starts)]
+    extendedscores = [x for x in extendedscores if x[1] > 0.]
+
+    if len(extendedscores) == 0:
+        starts = mappings.starts
+        print("Warning - could not generate sufficiently large extensions")
+    else:
+        starts, contributions = zip(*extendedscores)
+>>>>>>> fd720e31d76c8043def63ae4edb84792bc7c3dfc
 
     scorebins = numpy.arange(rangemin, rangemax+binsize-1, binsize)
     scores, _ = numpy.histogram(starts, bins=scorebins, weights=scores)

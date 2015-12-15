@@ -9,7 +9,6 @@ import argparse
 import scipy.stats
 import scipy.sparse
 import numpy
-import h5py
 import poremodel
 import fast5
 
@@ -87,7 +86,17 @@ def update_scale_parameters(pij, shift, scale, drift, scale_var, oldweight,
 
     return shift, scale, drift, scale_var
 
-def adjust_probabilities_for_transitions(pij, transition):
+def incorporate_transitions(pij, transition):
+    """
+    Given initial, purely local, probabilities for read events to be
+    associated with model levels, incorporate information from
+    the transition matrices to propagate that information further.
+
+    inputs: the probability matrix pij that gives probability of
+            read event i -> model level j,
+            sparse transition matrices T and T.T
+    outputs: updated pij
+    """
     sparsetrans, sparsetrans_inv = transition
     pnext = (sparsetrans_inv.dot(pij.T)).T
     pprev = (sparsetrans.dot(pij.T)).T
@@ -130,7 +139,7 @@ def rescale(event_means, event_starts, level_means, level_sds, level_kmers,
                                   drift, scale_var, level_means, level_sds)
         if ntransitions > 0:
             for i in range(ntransitions):
-                pij = adjust_probabilities_for_transitions(pij, transition)
+                pij = incorporate_transitions(pij, transition)
         shift, scale, drift, scale_var = \
                 update_scale_parameters(pij, shift, scale, drift, scale_var,
                                         oldweight, event_means, event_starts,
