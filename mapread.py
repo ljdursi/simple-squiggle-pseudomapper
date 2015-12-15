@@ -369,7 +369,7 @@ def colinear_extended_matches(mappings, binsize, dim,
         return [0.], [0]
 
     starts, readpos, refpos, scores = extend_matches(mappings, binsize, dim, nextend, nskip, skip_prob, stay_prob)
-    matches = zip(readpos, refpos)
+    matches = list(zip(readpos, refpos))
 
     idxs = [i[0] for i in sorted(enumerate(matches), key=lambda x: x[1])]
     scores = [scores[i] for i in idxs]
