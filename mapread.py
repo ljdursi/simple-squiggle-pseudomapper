@@ -6,6 +6,7 @@ Using kd-tree index, map ONT fast5 reads to bacterial genomes
  SimpsonLab, OICR
 """
 import argparse
+import cProfile
 import numpy
 import scipy.stats
 import matplotlib.pylab
@@ -104,7 +105,6 @@ def main():
             compl_bins, compl_posns = zip(*[colinear_extended_matches(complement, binsize, dim, 
                                                                       nextend=args.extend, nskip=args.skips)
                                           for complement in maps_compl])
-
         else:
             bin_edges = numpy.arange(-reflen, reflen+binsize-1, binsize)
             templ_bins = [start_bin_scores_extension(template, binsize, dim, 
@@ -155,7 +155,7 @@ def main():
             matplotlib.rcParams['font.size'] = 8
             matplotlib.pylab.title(infile+": "+strand)
             matplotlib.pylab.plot(posns[bestidx], scores[bestidx], 'ro')
-            if len(scores) > len(posns):
+            if len(scores) < len(posns):
                 matplotlib.pylab.plot(posns[1:-1], scores, '.')
             else:
                 matplotlib.pylab.plot(posns, scores, '.')
@@ -186,6 +186,7 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest,
              read length
     """
     read, times, _, _ = fast5.readevents(infile, complement=complement)
+    times = times - times[0]
     readlen = len(read)
 
     if emrescale:
@@ -194,12 +195,9 @@ def reads_maps_from_fast5(infile, indexes, maxdist, closest,
             if index is None:
                 continue
             model = index.model
-            level_means = model.means()
-            level_sds = model.sds()
-            level_kmers = model.kmers()
             shift, scale, drift, _, _ = em_rescale.rescale(read, times,
-                                                           level_means, level_sds,
-                                                           level_kmers)
+                                                           model.means(), model.sds(), 
+                                                           model.kmers())
             scaledreads.append((read - shift - drift*times)/scale)
     else:
         scaledreads = [index.scale_events(read) for index in indexes
@@ -369,7 +367,7 @@ def colinear_extended_matches(mappings, binsize, dim,
         return [0.], [0]
 
     starts, readpos, refpos, scores = extend_matches(mappings, binsize, dim, nextend, nskip, skip_prob, stay_prob)
-    matches = zip(readpos, refpos)
+    matches = list(zip(readpos, refpos))
 
     idxs = [i[0] for i in sorted(enumerate(matches), key=lambda x: x[1])]
     scores = [scores[i] for i in idxs]
@@ -420,4 +418,5 @@ def colinear_extended_matches(mappings, binsize, dim,
 
 
 if __name__ == "__main__":
-    main()
+    #main()
+    cProfile.run('main()','main.profile')
