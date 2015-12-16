@@ -156,7 +156,7 @@ main () {
     echo "6mer data: "
     echo 
 
-    makeindex models/6mer/template.model indices/ecoli-6mer-template 7
+    makeindex models/6mer/template.model indices/ecoli-6mer-template 8
 
     FILES=($( ls ecoli/006/*fast5 ))
     mapreads FILES[@] template-only-006.txt $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx 
@@ -165,8 +165,8 @@ main () {
 
     if [ "$complement" = true ]
     then
-        makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 7
-        makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 7
+        makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 8
+        makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 8
         mapreads FILES[@] template-complement-006.txt $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx\
             indices/ecoli-6mer-complement_pop1.kdtidx,indices/ecoli-6mer-complement_pop2.kdtidx
         echo ""
