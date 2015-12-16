@@ -18,7 +18,7 @@ def init_scaling_parameters(events, means):
     to level means.
     """
     drift = 0.
-    scale_var = 1.
+    scale_var = 0.7
 
     scale = numpy.std(events)/numpy.std(means)
     shift = numpy.mean(events) - numpy.mean(scale*means)
@@ -34,7 +34,7 @@ def event_probabilities(events, times, shift, scale, drift, scale_var, means, sd
 
     sevents = events - drift*times
     smeans = means*scale + shift
-    ssds = sds / numpy.sqrt(scale_var)
+    ssds = sds * scale_var
 
     pij = numpy.zeros((nevents, nlevels), dtype=numpy.float32)
     for i, sevent in enumerate(sevents):
@@ -83,6 +83,7 @@ def update_scale_parameters(pij, shift, scale, drift, scale_var, oldweight,
 
     scale_var = numpy.sum(wij*y.T)
     scale_var = scale_var / numpy.sum(pij)
+    scale_var = numpy.sqrt(scale_var)
 
     return shift, scale, drift, scale_var
 
@@ -173,10 +174,14 @@ def main():
                         help='Print output each iteration')
     args = parser.parse_args()
 
+    oldweight = 0. if not args.damp else args.prevweight
+    numtransitions = 0 if not args.transition else args.numtransitions
+
     for fn in args.input:
         strand = True if args.strand == "complement" else False
         try:
-            event_means, _, event_starts, read_kmers = fast5.read_basecalled_events(fn, strand)
+            event_means, event_starts, _, read_kmers = fast5.read_basecalled_events(fn, strand)
+            event_starts = event_starts - event_starts[0]
             model = poremodel.PoreModel(fn, True if strand == 'complement' else False)
             level_means = model.means()
             level_sds = model.sds()
@@ -184,16 +189,6 @@ def main():
         except:
             print("Could not access fields in file "+fn)
             continue
-
-        if not args.damp:
-            oldweight = 0.
-        else:
-            oldweight = args.prevweight
-
-        if not args.transition:
-            numtransitions = 0
-        else:
-            numtransitions = args.numtransitions
 
         shift, scale, drift, scale_var, pij = \
                 rescale(event_means, event_starts, level_means, level_sds,
