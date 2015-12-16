@@ -187,7 +187,7 @@ class PoreModel(object):
         return numpy.array(list(self.__level_stdv.values()))
 
     def kmers(self):
-        """Returns the level sds of the model as an array"""
+        """Returns kmers in the model in the same order as sds & means"""
         return numpy.array(list(self.__level_mean.keys()))
 
 
