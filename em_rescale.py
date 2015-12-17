@@ -139,7 +139,10 @@ def rescale(event_means, event_starts, level_means, level_sds, level_kmers,
         pij = event_probabilities(event_means, event_starts, shift, scale,
                                   drift, scale_var, level_means, level_sds)
         if ntransitions > 0:
-            for i in range(ntransitions):
+            # ramp up the number of transitions
+            # for both performance and accuracy
+            loc_ntransitions = (i*ntransitions)//niters + 1
+            for _ in range(loc_ntransitions):
                 pij = incorporate_transitions(pij, transition)
         shift, scale, drift, scale_var = \
                 update_scale_parameters(pij, shift, scale, drift, scale_var,
