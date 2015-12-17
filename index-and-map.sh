@@ -95,6 +95,12 @@ function niceoutput {
     export LANG=${oldlang}
 }
 
+function joinarray { 
+    local IFS="$1"
+    shift
+    echo "$*"
+}
+
 main () {
     local closest=true
     local complement=true
@@ -137,18 +143,22 @@ main () {
 
     FILES=($( ls ecoli/005/*fast5 ))
 
-    mapreads FILES[@] template-only-005.txt $closest $rescale $extend $longest indices/ecoli-5mer-template.kdtidx 
+    local filebase=$( joinarray _ "${ARGS[@]}" )
+    local filename="template-005-${filebase}.txt"
+
+    mapreads FILES[@] $filename $closest $rescale $extend $longest indices/ecoli-5mer-template.kdtidx 
     echo "Template Only Alignments"
-    niceoutput template-only-005.txt ecoli/005/bwamem-ecoli-map-locations.txt 
+    niceoutput $filename ecoli/005/bwamem-ecoli-map-locations.txt 
 
     if [ "$complement" = true ]
     then
         makeindex models/5mer/complement.model indices/ecoli-5mer-complement 8
-        mapreads FILES[@] template-complement-005.txt $closest $rescale $extend $longest \
+        filename="template-complement-005-${filebase}.txt"
+        mapreads FILES[@] $filename $closest $rescale $extend $longest \
             indices/ecoli-5mer-template.kdtidx indices/ecoli-5mer-complement.kdtidx usetemplate
         echo ""
         echo "Template+Complement Alignements"
-        niceoutput template-complement-005.txt ecoli/005/bwamem-ecoli-map-locations.txt
+        niceoutput $filename ecoli/005/bwamem-ecoli-map-locations.txt
     fi
 
     echo
@@ -159,19 +169,22 @@ main () {
     makeindex models/6mer/template.model indices/ecoli-6mer-template 8
 
     FILES=($( ls ecoli/006/*fast5 ))
-    mapreads FILES[@] template-only-006.txt $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx 
+    filename="template-006-${filebase}.txt"
+
+    mapreads FILES[@] $filename $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx 
     echo "Template Only Alignments"
-    niceoutput template-only-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
+    niceoutput $filename ecoli/006/bwamem-ecoli-map-locations.txt
 
     if [ "$complement" = true ]
     then
         makeindex models/6mer/complement_pop1.model indices/ecoli-6mer-complement_pop1 8
         makeindex models/6mer/complement_pop2.model indices/ecoli-6mer-complement_pop2 8
-        mapreads FILES[@] template-complement-006.txt $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx\
+        filename="template-complement-006-${filebase}.txt"
+        mapreads FILES[@] $filename  $closest $rescale $extend $longest indices/ecoli-6mer-template.kdtidx\
             indices/ecoli-6mer-complement_pop1.kdtidx,indices/ecoli-6mer-complement_pop2.kdtidx
         echo ""
         echo "Template+Complement Alignements"
-        niceoutput template-complement-006.txt ecoli/006/bwamem-ecoli-map-locations.txt
+        niceoutput $filename ecoli/006/bwamem-ecoli-map-locations.txt
     fi
 }
 
