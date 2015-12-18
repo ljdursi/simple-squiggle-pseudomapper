@@ -418,5 +418,5 @@ def colinear_extended_matches(mappings, binsize, dim,
 
 
 if __name__ == "__main__":
-    #main()
-    cProfile.run('main()','main.profile')
+    main()
+    #cProfile.run('main()','main.profile')
