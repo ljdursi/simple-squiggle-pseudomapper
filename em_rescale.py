@@ -18,7 +18,7 @@ def init_scaling_parameters(events, means):
     to level means.
     """
     drift = 0.
-    scale_var = 0.7
+    scale_var = 1.5 
 
     scale = numpy.std(events)/numpy.std(means)
     shift = numpy.mean(events) - numpy.mean(scale*means)
@@ -175,6 +175,8 @@ def main():
                         help='Number of transition iterations to use')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Print output each iteration')
+    parser.add_argument('-m', '--model', type=str,
+                        help='Optionally use a provided model')
     args = parser.parse_args()
 
     oldweight = 0. if not args.damp else args.prevweight
@@ -185,7 +187,10 @@ def main():
         try:
             event_means, event_starts, _, read_kmers = fast5.read_basecalled_events(fn, strand)
             event_starts = event_starts - event_starts[0]
-            model = poremodel.PoreModel(fn, True if strand == 'complement' else False)
+            if not args.model:
+                model = poremodel.PoreModel(fn, True if strand == 'complement' else False)
+            else:
+                model = poremodel.PoreModel(args.model, True if strand == 'complement' else False)
             level_means = model.means()
             level_sds = model.sds()
             kmers = model.kmers()
